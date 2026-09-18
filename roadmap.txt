@@ -1,0 +1,131 @@
+1. Java
+  - Basics
+    - Classes, Variables, Loops etc
+    - OOPs
+    - Collections
+    - Generics
+  - Advanced
+    - Design Patterns
+    - JVM
+    - Threads
+    - Servlets and JSP’s
+    - Concurrency
+    - Garbage Collection
+  - Build Tools (Maven, Gradle, Ant)
+  - Servers (Tomcat, Weblogic, JBOSS, WebSphere, Jetty)
+  - Testing
+    - Unit Testing
+    - Integration Testing
+    - JUnit
+    - Mockito
+  - Logging (Log4j, Log4j2, Logback)
+
+2. Spring Framework
+  - Core
+    - Bean Life Cycle
+    - Dependency Injection
+    - Inversion of Control
+    - Bean Factory & Application Context
+  - Web
+    - Annotations
+    - MVC Structure
+    - Configurations
+    - Integrating different Libraries/Frameworks
+    - Profiles
+  - AOP
+    - How AOP Works
+    - Creating PointCut, Join Point, Aspect etc
+
+3. Spring Boot
+  - Importance of Spring Boot
+  - Auto Configuration
+  - Adding Configuration
+  - Properties/YAML
+  - Integrations with other Libraries/Frameworks
+
+4. REST API
+  - HTTP Methods
+    - POST
+    - GET
+    - PUT
+    - DELETE
+    - OPTIONS
+    - TRACE
+  - HTTP Status Codes
+    - 1.X.X
+    - 2.X.X
+    - 3.X.X
+    - 4.X.X
+    - 5.X.X
+
+5. Database
+  - SQL
+    - My SQL
+    - Postgress SQL
+    - Oracle
+  - No SQL
+    - Mongo Db
+    - Cassandra
+  - Spring Data
+    - Spring Data JPA
+    - Spring Data MongoDB
+    - Spring Data JDBC
+
+6. Spring Security
+  - Authentication
+  - Authorization
+  - OAuth2
+  - Form Authentications
+  - JWT
+
+7. Microservices
+  - Spring Cloud
+    - Spring Cloud Gateway
+    - Spring Cloud Config
+    - Spring Cloud Circuit Breaker
+    - Spring Cloud OpenFeign
+    - Spring Cloud Sleuth
+    - Other Spring Cloud Projects (based on requirement)
+  - Devops
+    - Docker
+    - Kubernetes
+    - Cloud (AWS, GCP, Azure)
+  - Microservices Patterns
+    - Aggregator
+    - CQRS
+    - SAGA
+    - Event Sourcing
+  - Microservices Queues
+    - SQS
+    - Kafka
+    - RabbitMQ
+
+8. Software Engineering for Backend
+  - Clean Code
+  - SOLID Principles
+  - API Versioning
+  - Idempotency
+  - Rate Limiting
+  - System Design Basics
+    - Scalability, Availability, Reliability
+    - Load Balancing
+    - Circuit Breaker
+    - CDN
+  - Database Scaling
+    - Replication
+    - Partitioning
+    - Sharding
+  - Redis
+    - Caching
+    - Distributed Locks
+    - Pub/Sub
+    - Rate Limiting
+  - Messaging Systems
+    - Kafka
+    - RabbitMQ
+    - Dead Letter Queue
+  - Observability
+    - Logging & Tracing
+    - Prometheus
+    - Grafana
+    - OpenTelemetry

@@ -66,17 +66,109 @@
   - No SQL
     - Mongo Db
     - Cassandra
-  - Spring Data
-    - Spring Data JPA
+  - Spring Data 
+    - Spring Data JPA (Important & as detailed as possible)
+      - Core Architecture & Internals
+        - JPA (Jakarta Persistence) vs Hibernate ORM vs Spring Data JPA
+        - EntityManager, EntityManagerFactory & Persistence Context
+        - Entity Lifecycle States (Transient, Managed, Detached, Removed)
+        - Dirty Checking Mechanism, Flush Mode, Flush Order (ActionQueue) & First-Level Cache
+        - Open Session In View (OSIV) Anti-Pattern: Why production MUST disable spring.jpa.open-in-view=false
+      - Entity Mapping & Relationships
+        - Basic & Embedded Mapping (@Entity, @Table, @Id, @Column, @Embedded, @Embeddable, @ElementCollection)
+        - Primary Key Strategies (IDENTITY, SEQUENCE with allocationSize, TABLE, UUID v7 Generator)
+        - Relationship Mappings (@OneToOne, @OneToMany, @ManyToOne, @ManyToMany)
+        - Cascade Types (PERSIST, MERGE, REMOVE, REFRESH, DETACH, ALL) & orphanRemoval
+        - FetchType Strategies (LAZY vs EAGER - best practices & anti-patterns)
+        - LazyInitializationException: Root cause, anti-patterns & clean architectural solutions
+      - Repositories & Querying
+        - Repository Interfaces hierarchy (Repository -> CrudRepository -> ListCrudRepository -> JpaRepository)
+        - Derived Query Methods (Naming conventions, keywords, limiting, exists/count/delete)
+        - JPQL (Java Persistence Query Language) & HQL
+        - Native SQL Queries (@Query(nativeQuery = true)) & @SqlResultSetMapping
+        - Modifying Queries (@Modifying, clearAutomatically, flushAutomatically)
+        - Projections (Interface-based, Class-based DTO with constructor expression, Record projections)
+      - Dynamic Querying & Type-Safe Queries
+        - JPA Criteria API & Metamodel Generator (hibernate-jpamodelgen)
+        - Spring Data Specifications (Specification<T> & JpaSpecificationExecutor)
+        - Querydsl Integration (JPAQueryFactory, Q-Classes, BooleanBuilder)
+      - Performance Optimization & Production Troubleshooting
+        - The N+1 Query Problem: Root cause, detection & tools (Datasource-proxy, QuickPerf, Hibernate stats)
+        - Solutions to N+1: JOIN FETCH, @EntityGraph (Named & Dynamic Entity Graphs), @BatchSize
+        - Pagination Pitfalls: In-memory pagination trap with JOIN FETCH on ToMany relations (HHH000104)
+        - Keyset (Cursor-based) Pagination with Spring Data Scroll API (ScrollPosition, WindowIterator) vs Offset Pagination
+        - HikariCP Connection Pool: Sizing formula, connection leak detection (leakDetectionThreshold), connection acquisition lifecycle
+        - Batch Processing & Bulk Mutations (hibernate.jdbc.batch_size, order_inserts, order_updates, StatelessSession)
+        - Caching Architecture: First-Level vs Second-Level Cache (L2C with Redis/Ehcache/Hazelcast) & Query Cache
+        - Read-Only Transactions Optimization (@Transactional(readOnly = true) dirty-checking bypass)
+      - Transaction Management & High Concurrency
+        - Declarative Transactions (@Transactional): Propagation levels, Isolation levels, rollback rules
+        - Spring AOP Proxy caveats (Self-invocation issue, private methods & Transaction boundaries)
+        - Concurrency Control: Optimistic Locking (@Version, OptimisticLockException handling)
+        - Concurrency Control: Pessimistic Locking (PESSIMISTIC_READ, PESSIMISTIC_WRITE, SKIP LOCKED, NOWAIT)
+        - Database Deadlock Analysis & Prevention (Lock acquisition order alignment)
+        - Transactional Event Listeners (@TransactionalEventListener with TransactionPhase.AFTER_COMMIT)
+      - Auditing, Lifecycle Callbacks & Domain Events
+        - JPA Lifecycle Annotations (@PrePersist, @PostPersist, @PreUpdate, etc.)
+        - Spring Data JPA Auditing (@EnableJpaAuditing, @CreatedDate, @LastModifiedBy, AuditorAware)
+        - Hibernate Envers (Entity versioning & audit logs)
+        - Domain Events with AbstractAggregateRoot & @DomainEvents
+      - Database Migration & Multi-Tenancy
+        - Schema Migration (Flyway & Liquibase, ddl-auto=validate best practice)
+        - Zero-Downtime Database Migration (Expand and Contract Pattern)
+        - Multi-tenancy Architectures (Database-per-tenant, Schema-per-tenant, Row-level with @TenantId)
+      - Modern Spring Boot Integration
+        - Spring Boot 4.1.0 & Spring Framework 7.0.8 compatibility (Jakarta Persistence 3.2, Hibernate 7)
+        - Virtual Threads (Loom) with Connection Pooling (HikariCP thread-pinning avoidance)
     - Spring Data MongoDB
     - Spring Data JDBC
 
 6. Spring Security
-  - Authentication
-  - Authorization
-  - OAuth2
-  - Form Authentications
-  - JWT
+  - Core Architecture & Filter Chain Internals
+    - DelegatingFilterProxy & FilterChainProxy
+    - SecurityFilterChain architecture & default filter ordering (from ChannelProcessingFilter to FilterSecurityInterceptor/AuthorizationFilter)
+    - Security Context Model: SecurityContextHolder, SecurityContext, Authentication (Principal, Credentials, Authorities)
+    - ThreadLocal storage mechanism & SecurityContextHolder strategies (MODE_THREADLOCAL, MODE_INHERITABLETHREADLOCAL)
+    - Authentication Flow: AuthenticationManager, ProviderManager, AuthenticationProvider & UserDetailsService
+    - Authorization Model: Modern AuthorizationManager (replacing legacy AccessDecisionManager), RequestMatcherDelegatingAuthorizationManager
+  - Authentication Mechanisms
+    - Username/Password Authentication (DaoAuthenticationProvider, PasswordEncoder: BCrypt, Argon2, SCrypt)
+    - Session-based Authentication vs Stateless Token-based Architecture
+    - JWT (JSON Web Token) Deep Dive:
+      - Anatomy (Header, Claims/Payload, Signature), Symmetric (HMAC) vs Asymmetric (RSA/ECDSA) Signing
+      - Custom OncePerRequestFilter for JWT parsing and SecurityContext populating
+      - Dual-Token Architecture: Short-lived Access Token & Long-lived Refresh Token
+      - Refresh Token Rotation (RTR) & Token Family Tracking to detect token theft
+      - Instant Token Revocation & Blacklisting strategies (Redis TTL, JTI blacklist)
+      - Custom AuthenticationEntryPoint (401 Unauthorized) & AccessDeniedHandler (403 Forbidden) JSON responses
+  - Authorization & Access Control (RBAC & ABAC)
+    - URL-level Authorization: requestMatchers(), hasRole vs hasAuthority, permitAll, authenticated
+    - Method-level Security: @EnableMethodSecurity, @PreAuthorize, @PostAuthorize, @PreFilter, @PostFilter
+    - SpEL (Spring Expression Language) security expressions
+    - Custom PermissionEvaluator for Object-level and Domain-level security
+    - Attribute-Based Access Control (ABAC) using custom AuthorizationManager<RequestAuthorizationContext>
+  - OAuth 2.0 & OpenID Connect (OIDC) - Modern OAuth 2.1
+    - OAuth 2.0 vs OIDC: Roles (Resource Owner, Client, Authorization Server, Resource Server)
+    - OAuth 2.1 Specification: Why Implicit Grant & Resource Owner Password Credentials (ROPC) are deprecated
+    - Authorization Code Flow with PKCE (Proof Key for Code Exchange)
+    - Client Credentials Flow for Machine-to-Machine (M2M) communication
+    - Spring Security OAuth2 Resource Server: Nimbus JOSE + JWT decoder, JWKS uri endpoint validation
+    - Spring Security OAuth2 Client: Social Login (Google, GitHub, Keycloak, Auth0) & Token Relay
+    - Spring Authorization Server: Designing and hosting a dedicated Identity Provider (IdP)
+  - Application Hardening & Web Defenses
+    - CSRF (Cross-Site Request Forgery): Mechanics, CookieCsrfTokenRepository, SPA integration, and why stateless APIs disable CSRF
+    - CORS (Cross-Origin Resource Sharing): Preflight OPTIONS requests, CorsConfigurationSource, Allowed Origins vs Wildcard traps
+    - Security HTTP Response Headers (HSTS, Content Security Policy - CSP, X-Frame-Options, X-Content-Type-Options)
+    - Protection against Brute-Force & Credential Stuffing: Rate limiting (Bucket4j), failed attempt counters, Account Locking
+    - Sensitive Data Masking & Secure Password Storage
+  - Advanced Security Engineering & Production Mastery
+    - SecurityContext propagation with Virtual Threads (Project Loom) & Asynchronous tasks (@Async, TaskDecorator)
+    - Multi-Factor Authentication (MFA / 2FA with TOTP - RFC 6238, Google Authenticator)
+    - Multi-Tenant Security: Tenant-aware SecurityContext and Dynamic Tenant-specific UserDetailsService/Keycloak realms
+    - Zero Trust Architecture: Mutual TLS (mTLS) between microservices
+  - Modern Spring Boot Integration
+    - Spring Boot 4.1.0 & Spring Framework 7.0.8 / Spring Security 7.x Functional Lambda DSL (http.authorizeHttpRequests(...))
+    - Complete removal of WebSecurityConfigurerAdapter & modern component-based configuration
 
 7. Microservices
   - Spring Cloud

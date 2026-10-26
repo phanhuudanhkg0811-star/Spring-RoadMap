@@ -103,7 +103,7 @@ flowchart TD
         DB[(RDBMS: PostgreSQL 17 / MySQL 9)]
     end
 
-    Service -->|1. userRepository.findByEmail()| Proxy
+    Service -->|"1. userRepository.findByEmail"| Proxy
     Proxy -->|2. Ủy quyền thực thi| SimpleRepo
     SimpleRepo -->|3. Gọi API chuẩn| EM
     EM -->|4. Unwrap ra Session thật| Session

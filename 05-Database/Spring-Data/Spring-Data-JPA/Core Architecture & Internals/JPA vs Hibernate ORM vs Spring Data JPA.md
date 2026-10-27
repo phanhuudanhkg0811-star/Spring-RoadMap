@@ -100,18 +100,18 @@ flowchart TD
     end
 
     subgraph Database["Cơ Sở Dữ Liệu"]
-        DB[(RDBMS: PostgreSQL 17 / MySQL 9)]
+        DB[("RDBMS: PostgreSQL 17 / MySQL 9")]
     end
 
     Service -->|"1. userRepository.findByEmail"| Proxy
-    Proxy -->|2. Ủy quyền thực thi| SimpleRepo
-    SimpleRepo -->|3. Gọi API chuẩn| EM
-    EM -->|4. Unwrap ra Session thật| Session
+    Proxy -->|"2. Ủy quyền thực thi"| SimpleRepo
+    SimpleRepo -->|"3. Gọi API chuẩn"| EM
+    EM -->|"4. Unwrap ra Session thật"| Session
     Session --> L1Cache
     Session --> SQM
     SQM --> SQLAST
     SQLAST --> ActionQueue
-    ActionQueue -->|5. Gửi câu SQL đã tối ưu| Hikari
+    ActionQueue -->|"5. Gửi câu SQL đã tối ưu"| Hikari
     Hikari --> JDBC
     JDBC --> DB
 
@@ -265,8 +265,8 @@ flowchart TD
     subgraph RuntimeCall["Khi có lệnh gọi: userRepository.findByEmail('test@gmail.com')"]
         F["Lời gọi hàm đi vào JdkDynamicAopProxy"]
         G{"Hàm có sẵn trong JpaRepository?"}
-        G -- "CÓ (save, findById, delete...)" --> H["Chuyển thẳng sang SimpleJpaRepository thực thi"]
-        G -- "KHÔNG (Query Method tùy biến)" --> I["PartTreeQuery phân tích tên hàm: findBy + Email"]
+        G -->|"CÓ (save, findById, delete...)"| H["Chuyển thẳng sang SimpleJpaRepository thực thi"]
+        G -->|"KHÔNG (Query Method tùy biến)"| I["PartTreeQuery phân tích tên hàm: findBy + Email"]
         I --> J["Biên dịch thành JPQL: SELECT u FROM User u WHERE u.email = ?1"]
         J --> K["Thực thi qua EntityManager.createQuery()"]
     end

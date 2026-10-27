@@ -135,7 +135,7 @@ sequenceDiagram
     end
     EM-->>Service: Trả về đối tượng product
 
-    Note over Service: 2. product.reduceStock(5); (Thao tác trên RAM)
+    Note over Service: 2. product.reduceStock(5) - Thao tác trên RAM
 
     Service-->>Client: Kết thúc method Service
     Note over Service: 3. Spring chuẩn bị Commit Transaction

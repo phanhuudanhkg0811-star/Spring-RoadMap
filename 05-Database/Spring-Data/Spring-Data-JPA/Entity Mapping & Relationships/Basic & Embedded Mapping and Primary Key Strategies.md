@@ -1,50 +1,89 @@
-# 🏷️ Basic & Embedded Mapping & Chiến lược Khóa chính (Primary Key Strategies)
+# 🏷️ Basic & Embedded Mapping (@Entity, @Table, @Id, @Column, @Embedded, @Embeddable, @ElementCollection)
 
-> **Nguồn chính thống:** [Jakarta Persistence 3.2 Specification](https://jakarta.ee/specifications/persistence/3.2/) | [Hibernate ORM 7.x User Guide](https://hibernate.org/orm/documentation/) | [Spring Data JPA Reference](https://docs.spring.io/spring-data/jpa/reference/index.html)
+> **Nguồn chính thống:** [Jakarta Persistence 3.2 Specification](https://jakarta.ee/specifications/persistence/3.2/) | [Hibernate ORM 7.x User Guide](https://docs.jboss.org/hibernate/orm/7.0/userguide/html_single/Hibernate_User_Guide.html) | [Spring Data JPA Reference](https://docs.spring.io/spring-data/jpa/reference/index.html)
 >
-> **Thuộc roadmap:** `5. Database → Spring Data → Spring Data JPA → Entity Mapping & Relationships → Basic & Embedded Mapping & Primary Key Strategies`
+> **Thuộc roadmap:** `5. Database → Spring Data → Spring Data JPA → Entity Mapping & Relationships → Basic & Embedded Mapping`
 
 ---
 
-## 1. Các Annotation Ánh xạ Cơ bản (Basic Mapping)
+## 1. Định nghĩa chính thức từ Jakarta Persistence 3.2 Specification
 
-Một Entity trong JPA là một lớp Java (POJO) đại diện cho một bảng trong CSDL. Để JPA hiểu cách chuyển đổi qua lại giữa Java và Database, ta sử dụng các annotation chuẩn sau:
+> *"An **entity** is a lightweight persistent domain object. The primary programming artifact of an entity is the **entity class**. An entity class may make use of auxiliary classes that serve as helper classes or that are used to represent the **state** of the entity."*
+>
+> — **Jakarta Persistence 3.2 — Chapter 2: Entity Classes**
 
-### 1.1 `@Entity` & Yêu cầu của JPA Proxy
-- **Bản chất:** Đánh dấu một class là một Entity được quản lý bởi JPA.
-- **Quy tắc bắt buộc từ đặc tả JPA:**
-  1. **Bắt buộc phải có Constructor không tham số (No-arg constructor):** Có thể là `public` hoặc `protected`. Hibernate sử dụng Reflection để khởi tạo object trước khi nạp dữ liệu từ ResultSet.
-  2. **Class và các method KHÔNG ĐƯỢC là `final`:** Hibernate sử dụng thư viện **ByteBuddy** để tạo các lớp con Proxy (Subclassing proxy). Nếu class hoặc method bị đánh dấu `final`, Hibernate không thể tạo Proxy để thực hiện Lazy Loading!
-  3. **Bắt buộc phải có thuộc tính Khóa chính (`@Id`).**
+> *"An **embeddable** class is a class that is used to represent the state of an entity but which does **not** have a persistent identity of its own. Instances of an embeddable class share the identity of the entity that **owns** them."*
+>
+> — **Jakarta Persistence 3.2 — Chapter 2.6: Embeddable Classes**
+
+### Dịch & giải thích đơn giản:
+
+**Entity (Thực thể)** là một đối tượng Java nhẹ đại diện cho một bản ghi trong CSDL. Mỗi Entity class ánh xạ tới một bảng, mỗi thuộc tính (field) ánh xạ tới một cột.
+
+**Embeddable (Đối tượng nhúng)** là một class phụ trợ **không có ID riêng** — nó chia sẻ danh tính (identity) với Entity sở hữu nó. Các thuộc tính của Embeddable trở thành các cột **ngay trong bảng** của Entity mẹ.
+
+> **Hình dung đơn giản:**
+> - `@Entity User` → Bảng `users` trong CSDL (có cột `id` riêng)
+> - `@Embeddable Address` → **Không tạo bảng riêng** — các cột `street`, `city`, `zip_code` nằm luôn trong bảng `users`!
+
+> [!IMPORTANT]
+> Entity Mapping là nền tảng của mọi thứ trong JPA. Nếu bạn không hiểu rõ cách ánh xạ Java class ↔ Database table, mọi kiến thức về Repository, Query, Transaction phía sau đều sẽ không có ý nghĩa.
+
+---
+
+## 2. Các Annotation Ánh xạ Cơ bản (Basic Mapping)
+
+### 2.1 `@Entity` — Đánh dấu một class là Thực thể JPA
+
+**Theo đặc tả JPA 3.2, một Entity class BẮT BUỘC phải tuân thủ:**
+
+| Quy tắc | Chi tiết kỹ thuật | Lý do |
+| :--- | :--- | :--- |
+| **Constructor no-arg** | Phải có constructor không tham số (`public` hoặc `protected`). | Hibernate sử dụng **Reflection** (`Class.getDeclaredConstructor().newInstance()`) để khởi tạo object trước khi nạp dữ liệu từ `ResultSet`. |
+| **Không được `final`** | Class và các method **KHÔNG ĐƯỢC** là `final`. | Hibernate sử dụng **ByteBuddy** để tạo Proxy subclass phục vụ **Lazy Loading**. Nếu class/method là `final` → ByteBuddy không thể kế thừa → Lazy Loading thất bại! |
+| **Phải có `@Id`** | Bắt buộc phải khai báo thuộc tính Khóa chính. | JPA sử dụng ID để quản lý Entity trong **Persistence Context** (Identity Map pattern). |
+| **Phải là Top-level class** | Không được là inner class, enum, hoặc interface. | JPA cần class có lifecycle rõ ràng để quản lý vòng đời persist/detach/remove. |
 
 ```java
-@Entity
-@Table(name = "customers")
+@Entity                              // ← Đánh dấu đây là Entity
+@Table(name = "customers")            // ← Ánh xạ tới bảng "customers" trong CSDL
 @Getter @Setter
-@NoArgsConstructor(access = AccessLevel.PROTECTED) // Chuẩn: Constructor no-arg protected
+@NoArgsConstructor(access = AccessLevel.PROTECTED) // ← Chuẩn: Constructor no-arg protected
 public class Customer {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false)
+    private String fullName;
     // ...
 }
 ```
 
+> [!TIP]
+> **Tại sao dùng `AccessLevel.PROTECTED` thay vì `public`?** Constructor `protected` ngăn chặn việc khởi tạo Entity trực tiếp bằng `new Customer()` từ code nghiệp vụ bên ngoài (vì Entity nên được tạo thông qua factory method hoặc constructor có tham số). Đồng thời, `protected` vẫn đủ cho Hibernate Reflection và ByteBuddy subclassing hoạt động bình thường.
+
 ---
 
-### 1.2 `@Table` — Cấu hình bảng nâng cao
-Không chỉ dừng lại ở việc đặt tên bảng, `@Table` cho phép bạn định nghĩa các ràng buộc toàn vẹn và chỉ mục CSDL ngay trong code Java:
+### 2.2 `@Table` — Cấu hình bảng nâng cao
+
+`@Table` không chỉ đặt tên bảng — nó cho phép định nghĩa toàn bộ cấu trúc DDL (ràng buộc và chỉ mục) ngay trong code Java:
 
 ```java
 @Entity
 @Table(
-    name = "users",
-    schema = "auth_schema", // Định danh schema (PostgreSQL)
+    name = "users",                  // Tên bảng trong CSDL
+    schema = "auth_schema",          // Schema cụ thể (PostgreSQL, SQL Server)
     uniqueConstraints = {
+        // Ràng buộc UNIQUE trên 1 cột
         @UniqueConstraint(name = "uk_users_email", columnNames = {"email"}),
-        @UniqueConstraint(name = "uk_users_phone_country", columnNames = {"phone_number", "country_code"})
+        // Ràng buộc UNIQUE tổ hợp nhiều cột (Composite Unique)
+        @UniqueConstraint(name = "uk_users_phone_country",
+                          columnNames = {"phone_number", "country_code"})
     },
     indexes = {
+        // Index thường (để tăng tốc tìm kiếm)
         @Index(name = "idx_users_created_at", columnList = "created_at DESC"),
         @Index(name = "idx_users_status", columnList = "status")
     }
@@ -52,35 +91,93 @@ Không chỉ dừng lại ở việc đặt tên bảng, `@Table` cho phép bạ
 public class User { ... }
 ```
 
+**SQL DDL tương ứng được Hibernate sinh ra khi `ddl-auto = create`:**
+```sql
+CREATE TABLE auth_schema.users (
+    -- ... các cột ...
+    CONSTRAINT uk_users_email UNIQUE (email),
+    CONSTRAINT uk_users_phone_country UNIQUE (phone_number, country_code)
+);
+
+CREATE INDEX idx_users_created_at ON auth_schema.users (created_at DESC);
+CREATE INDEX idx_users_status ON auth_schema.users (status);
+```
+
+> [!NOTE]
+> Nếu **không có** `@Table`, JPA mặc định sử dụng **tên class** làm tên bảng (ví dụ: class `User` → bảng `User`). Hibernate áp dụng `PhysicalNamingStrategy` để chuyển đổi sang snake_case nếu được cấu hình: `User` → `users`, `OrderItem` → `order_items`.
+
 ---
 
-### 1.3 `@Column` — Định nghĩa thuộc tính chi tiết
+### 2.3 `@Id` — Mọi Entity đều phải có danh tính
 
-| Thuộc tính của `@Column` | Kiểu | Ý nghĩa kỹ thuật |
-| :--- | :---: | :--- |
-| `name` | `String` | Tên cột thực tế trong bảng CSDL. |
-| `nullable` | `boolean` | `false` tương đương ràng buộc `NOT NULL` ở mức DDL và Validation. |
-| `unique` | `boolean` | Tạo ràng buộc `UNIQUE` cho cột này. |
-| `length` | `int` | Độ dài tối đa cho kiểu chuỗi (`VARCHAR(length)`), mặc định là 255. |
-| `precision`, `scale` | `int` | Dành cho `BigDecimal`: `precision` là tổng số chữ số, `scale` là số chữ số thập phân (`DECIMAL(19, 4)`). |
-| `insertable` | `boolean` | Nếu `false`, cột này sẽ bị loại trừ khỏi câu lệnh SQL `INSERT`. |
-| `updatable` | `boolean` | Nếu `false`, cột này **vĩnh viễn không bị UPDATE** dù bạn có gọi `setter` (Rất hữu ích cho cột `created_at` hoặc `user_id` sở hữu). |
+Theo đặc tả JPA 3.2:
+
+> *"Every entity must have a **primary key**. The primary key must be defined on the entity class that is the **root** of the entity hierarchy or on a **mapped superclass** that is a (direct or indirect) superclass of all entity classes in the entity hierarchy."*
+>
+> — **Jakarta Persistence 3.2 — Section 2.4: Primary Keys and Entity Identity**
+
+`@Id` đánh dấu một thuộc tính là khóa chính. JPA sử dụng khóa chính để:
+1. Xác định **danh tính duy nhất** của mỗi Entity trong Persistence Context (giống key trong HashMap).
+2. Thực hiện thao tác `find()`, `merge()`, `remove()`.
+3. Phân biệt entity mới (cần `INSERT`) và entity đã tồn tại (cần `UPDATE`).
 
 ```java
+@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;  // Khóa chính đơn giản nhất
+```
+
+> [!TIP]
+> Chi tiết về các chiến lược sinh khóa chính (`IDENTITY`, `SEQUENCE`, `TABLE`, UUID v7), thuật toán Pooled-Lo Optimizer, cạm bẫy JDBC Batching, Composite Key, và `equals()`/`hashCode()` chuẩn Senior → Xem tài liệu chuyên sâu: [Primary Key Strategies.md](file:///d:/WebSpace/Java-Backend/05-Database/Spring-Data/Spring-Data-JPA/Entity%20Mapping%20%26%20Relationships/Primary%20Key%20Strategies.md)
+
+---
+
+### 2.4 `@Column` — Kiểm soát chi tiết từng cột
+
+`@Column` cho phép kiểm soát chính xác cách mỗi thuộc tính Java ánh xạ sang cột CSDL:
+
+| Thuộc tính | Kiểu | Ý nghĩa kỹ thuật | Mặc định |
+| :--- | :---: | :--- | :---: |
+| `name` | `String` | Tên cột thực tế trong bảng CSDL. | Tên field |
+| `nullable` | `boolean` | `false` → ràng buộc `NOT NULL` ở mức DDL. | `true` |
+| `unique` | `boolean` | Tạo ràng buộc `UNIQUE` cho cột này. | `false` |
+| `length` | `int` | Độ dài tối đa cho kiểu chuỗi (`VARCHAR(length)`). | `255` |
+| `precision`, `scale` | `int` | Dành cho `BigDecimal`: `precision` = tổng số chữ số, `scale` = số thập phân → `DECIMAL(19, 4)`. | `0` |
+| `insertable` | `boolean` | Nếu `false`, cột bị loại khỏi câu `INSERT`. | `true` |
+| `updatable` | `boolean` | Nếu `false`, cột **vĩnh viễn không bị UPDATE** dù có gọi setter. | `true` |
+| `columnDefinition` | `String` | Ghi đè toàn bộ DDL của cột bằng SQL tùy chỉnh. | `""` |
+
+```java
+// ⭐ Ví dụ thực tế áp dụng các thuộc tính @Column:
+
 @Column(name = "created_at", nullable = false, updatable = false)
 private Instant createdAt;
+// → NOT NULL + không bao giờ bị UPDATE (dù gọi setCreatedAt() cũng bị bỏ qua)
 
 @Column(name = "total_amount", nullable = false, precision = 19, scale = 4)
 private BigDecimal totalAmount;
+// → DECIMAL(19, 4) — Chính xác tuyệt đối cho dữ liệu tài chính
+
+@Column(name = "description", length = 2000)
+private String description;
+// → VARCHAR(2000) thay vì VARCHAR(255) mặc định
+
+@Column(name = "status_updated_by", insertable = false, updatable = false)
+private String statusUpdatedBy;
+// → Cột chỉ đọc (Read-only) từ phía JPA, giá trị do CSDL Trigger tự gán
+
+@Column(columnDefinition = "jsonb")
+private String metadata;
+// → Ghi đè DDL: Dùng kiểu jsonb của PostgreSQL thay vì VARCHAR mặc định
 ```
 
 ---
 
-### 1.4 `@Enumerated` — Cạm bẫy chết người `ORDINAL` vs `STRING`
+### 2.5 `@Enumerated` — Cạm bẫy chết người `ORDINAL` vs `STRING`
 
 Khi ánh xạ một `Enum` trong Java xuống Database, JPA cung cấp 2 chế độ:
-- `EnumType.ORDINAL`: Lưu chỉ số thứ tự số nguyên của Enum (0, 1, 2, ...).
-- `EnumType.STRING`: Lưu tên chuỗi ký tự của Enum ("ACTIVE", "PENDING", ...).
+- `EnumType.ORDINAL` (Mặc định): Lưu chỉ số thứ tự số nguyên (0, 1, 2, ...).
+- `EnumType.STRING`: Lưu tên chuỗi ký tự ("ACTIVE", "PENDING", ...).
 
 ```mermaid
 flowchart TD
@@ -100,20 +197,137 @@ flowchart TD
 ```
 
 > [!CAUTION]
-> **Quy tắc bắt buộc:** **LUÔN LUÔN** sử dụng `@Enumerated(EnumType.STRING)`. Không bao giờ được dùng `ORDINAL` trên các hệ thống doanh nghiệp vì chỉ cần một đồng nghiệp vô tình đổi thứ tự enum hoặc chèn thêm giá trị mới là toàn bộ dữ liệu CSDL sẽ bị phá hủy!
+> **Quy tắc bắt buộc:** **LUÔN LUÔN** sử dụng `@Enumerated(EnumType.STRING)`. Không bao giờ được dùng `ORDINAL` trên các hệ thống doanh nghiệp vì chỉ cần một đồng nghiệp vô tình đổi thứ tự enum hoặc chèn thêm giá trị mới là toàn bộ dữ liệu CSDL sẽ bị phá hủy âm thầm mà không có exception nào cảnh báo!
+
+```java
+// ✅ CHUẨN ENTERPRISE:
+@Enumerated(EnumType.STRING)   // Lưu "ACTIVE", "PENDING" thay vì 0, 1
+@Column(nullable = false, length = 30)
+private OrderStatus status = OrderStatus.PENDING;
+```
 
 ---
 
-## 2. Embedded & Embeddable Objects (Value Objects Pattern)
+### 2.6 `@Temporal` & Ánh xạ kiểu Ngày/Giờ
 
-Trong thiết kế phần mềm hướng miền (Domain-Driven Design - DDD), **Value Object** là những đối tượng không có danh tính độc lập (không có ID riêng) mà gắn liền với Entity mẹ.
+Với **Java 8+** và **JPA 2.2+** (Jakarta Persistence 3.2), bạn nên dùng các kiểu `java.time.*` mà **không cần** `@Temporal`:
 
-### 2.1 `@Embeddable` & `@Embedded`
-- `@Embeddable`: Đánh dấu một class là đối tượng nhúng.
-- `@Embedded`: Nhúng class đó vào Entity.
-- CSDL chỉ tạo **duy nhất 1 bảng**, các thuộc tính của Embeddable sẽ trở thành các cột trong bảng đó.
+| Kiểu Java | Kiểu CSDL | Ghi chú |
+| :--- | :--- | :--- |
+| `Instant` ⭐ | `TIMESTAMP WITH TIME ZONE` | **Khuyến nghị** cho timestamp — luôn lưu UTC. |
+| `LocalDateTime` | `TIMESTAMP` | Không có timezone — chỉ dùng khi chắc chắn không cần timezone. |
+| `LocalDate` | `DATE` | Chỉ ngày, không có giờ. |
+| `LocalTime` | `TIME` | Chỉ giờ, không có ngày. |
+| `ZonedDateTime` | `TIMESTAMP WITH TIME ZONE` | Có timezone — nhưng `Instant` thường đủ tốt hơn. |
+| `OffsetDateTime` | `TIMESTAMP WITH TIME ZONE` | Tương tự `ZonedDateTime`. |
 
 ```java
+// ✅ Chuẩn hiện đại — KHÔNG cần @Temporal:
+@Column(name = "created_at", nullable = false, updatable = false)
+private Instant createdAt;     // Luôn lưu UTC, hiển thị theo timezone người dùng
+
+@Column(name = "birth_date")
+private LocalDate birthDate;   // Chỉ cần ngày sinh, không cần giờ
+
+// ❌ Cách cũ (Java 7 trở về trước) — KHÔNG NÊN dùng nữa:
+// @Temporal(TemporalType.TIMESTAMP)
+// private java.util.Date createdAt;
+```
+
+> [!TIP]
+> **Quy tắc vàng:** Luôn dùng `Instant` cho timestamp (thời điểm xảy ra sự kiện) và `LocalDate` cho ngày thuần (sinh nhật, ngày bắt đầu). Tuyệt đối **không dùng** `java.util.Date` hay `java.sql.Timestamp` trong dự án mới.
+
+---
+
+### 2.7 `@Lob` — Dữ liệu lớn (BLOB / CLOB)
+
+Khi cần lưu dữ liệu lớn (văn bản dài, file nhị phân):
+
+```java
+@Lob
+@Column(name = "description")
+private String longDescription;  // → CLOB / TEXT trong CSDL
+
+@Lob
+@Column(name = "profile_picture")
+private byte[] profilePicture;   // → BLOB / BYTEA trong CSDL
+```
+
+> [!WARNING]
+> Lưu file lớn (ảnh, video) trực tiếp trong CSDL thường **không phải best practice**. Nên lưu file trên Object Storage (S3, MinIO) và chỉ lưu URL/path trong CSDL. `@Lob` phù hợp cho văn bản dài (mô tả sản phẩm, nội dung bài viết) hoặc file nhỏ (< 1MB).
+
+---
+
+### 2.8 `@Transient` — Thuộc tính không ánh xạ
+
+Đánh dấu một thuộc tính **không được lưu** vào CSDL:
+
+```java
+@Entity
+public class Product {
+    @Id @GeneratedValue
+    private Long id;
+
+    @Column(nullable = false, precision = 19, scale = 4)
+    private BigDecimal price;
+
+    @Column(nullable = false)
+    private int discountPercent;
+
+    @Transient  // ← Không tạo cột trong DB, chỉ dùng trong Java
+    private BigDecimal finalPrice;
+
+    public BigDecimal getFinalPrice() {
+        // Giá trị được tính toán runtime, không cần lưu
+        return price.multiply(BigDecimal.valueOf(100 - discountPercent))
+                    .divide(BigDecimal.valueOf(100));
+    }
+}
+```
+
+> [!NOTE]
+> Có 3 cách đánh dấu transient: `@Transient` (JPA annotation), `transient` (Java keyword), và `@JsonIgnore` (Jackson — chỉ ẩn khỏi JSON, vẫn lưu DB). Để không lưu vào DB, dùng `@Transient` hoặc `transient`.
+
+---
+
+## 3. Embedded & Embeddable Objects (Value Objects Pattern)
+
+### 3.1 Vấn đề: Tại sao cần Embeddable?
+
+Giả sử bạn có Entity `Customer` với 12 cột:
+
+```java
+// ❌ Flat Entity — Khó bảo trì, vi phạm SRP (Single Responsibility Principle):
+@Entity
+public class Customer {
+    @Id private Long id;
+    private String name;
+    private String email;
+    // Thông tin địa chỉ giao hàng (6 fields):
+    private String shippingStreet;
+    private String shippingCity;
+    private String shippingState;
+    private String shippingZipCode;
+    private String shippingCountry;
+    private String shippingPhone;
+    // Thông tin thanh toán (6 fields):
+    private String billingStreet;
+    private String billingCity;
+    private String billingState;
+    // ... (Lặp đi lặp lại!)
+}
+```
+
+**Vấn đề:** Mỗi khi cần dùng khái niệm "Địa chỉ" ở Entity khác (`Supplier`, `Warehouse`), bạn phải **copy-paste** toàn bộ 6 fields → Vi phạm nguyên tắc DRY (Don't Repeat Yourself).
+
+---
+
+### 3.2 `@Embeddable` & `@Embedded` — Giải pháp chuẩn DDD
+
+Trong Domain-Driven Design (DDD), **Value Object** là đối tượng không có danh tính riêng (không có ID), được định nghĩa hoàn toàn bởi giá trị các thuộc tính. `@Embeddable` chính là cách JPA hiện thực hóa Value Object:
+
+```java
+// ✅ Value Object: Địa chỉ không có ID riêng, gắn liền với Entity sở hữu
 @Embeddable
 @Getter @Setter
 @NoArgsConstructor
@@ -121,13 +335,51 @@ Trong thiết kế phần mềm hướng miền (Domain-Driven Design - DDD), **
 public class Address {
     private String street;
     private String city;
+    private String state;
+
+    @Column(name = "zip_code", length = 10)
     private String zipCode;
+
+    @Column(length = 2)
     private String country;
 }
 ```
 
-### 2.2 Tái sử dụng nhiều lần với `@AttributeOverrides`
-Nếu một Entity có cả `shippingAddress` và `billingAddress`, hai đối tượng này sẽ bị trùng tên cột (`street`, `city`...). Ta dùng `@AttributeOverrides` để định nghĩa lại tên cột:
+```java
+// ✅ Entity sử dụng Embeddable
+@Entity
+@Table(name = "customers")
+public class Customer {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Embedded  // ← Nhúng Address vào bảng customers
+    private Address homeAddress;
+}
+```
+
+**Kết quả trong CSDL — CHỈ CÓ DUY NHẤT 1 BẢNG:**
+```sql
+CREATE TABLE customers (
+    id         BIGINT PRIMARY KEY,
+    name       VARCHAR(255) NOT NULL,
+    street     VARCHAR(255),        -- ← Từ Address.street
+    city       VARCHAR(255),        -- ← Từ Address.city
+    state      VARCHAR(255),        -- ← Từ Address.state
+    zip_code   VARCHAR(10),         -- ← Từ Address.zipCode
+    country    VARCHAR(2)           -- ← Từ Address.country
+);
+-- ✅ Không có bảng "addresses" riêng biệt!
+```
+
+---
+
+### 3.3 Tái sử dụng nhiều lần với `@AttributeOverrides`
+
+Nếu một Entity có cả `shippingAddress` và `billingAddress`, hai đối tượng cùng kiểu `Address` sẽ bị **trùng tên cột** (`street`, `city`...). Ta dùng `@AttributeOverrides` để đổi tên cột:
 
 ```java
 @Entity
@@ -139,8 +391,8 @@ public class Order {
 
     @Embedded
     @AttributeOverrides({
-        @AttributeOverride(name = "street", column = @Column(name = "shipping_street")),
-        @AttributeOverride(name = "city", column = @Column(name = "shipping_city")),
+        @AttributeOverride(name = "street",  column = @Column(name = "shipping_street")),
+        @AttributeOverride(name = "city",    column = @Column(name = "shipping_city")),
         @AttributeOverride(name = "zipCode", column = @Column(name = "shipping_zip")),
         @AttributeOverride(name = "country", column = @Column(name = "shipping_country"))
     })
@@ -148,8 +400,8 @@ public class Order {
 
     @Embedded
     @AttributeOverrides({
-        @AttributeOverride(name = "street", column = @Column(name = "billing_street")),
-        @AttributeOverride(name = "city", column = @Column(name = "billing_city")),
+        @AttributeOverride(name = "street",  column = @Column(name = "billing_street")),
+        @AttributeOverride(name = "city",    column = @Column(name = "billing_city")),
         @AttributeOverride(name = "zipCode", column = @Column(name = "billing_zip")),
         @AttributeOverride(name = "country", column = @Column(name = "billing_country"))
     })
@@ -157,10 +409,26 @@ public class Order {
 }
 ```
 
+**Kết quả — Vẫn chỉ 1 bảng `orders` với tên cột tùy chỉnh:**
+```sql
+CREATE TABLE orders (
+    id                BIGINT PRIMARY KEY,
+    shipping_street   VARCHAR(255),
+    shipping_city     VARCHAR(255),
+    shipping_zip      VARCHAR(10),
+    shipping_country  VARCHAR(2),
+    billing_street    VARCHAR(255),
+    billing_city      VARCHAR(255),
+    billing_zip       VARCHAR(10),
+    billing_country   VARCHAR(2)
+);
+```
+
 ---
 
-### 2.3 `@ElementCollection` & `@CollectionTable`
-Khi bạn muốn lưu một danh sách các giá trị đơn giản (`List<String> tags`) hoặc danh sách các `@Embeddable` mà **không muốn tạo riêng một Entity có `@Id`**, hãy dùng `@ElementCollection`.
+### 3.4 `@ElementCollection` & `@CollectionTable` — Lưu danh sách giá trị đơn giản
+
+Khi bạn muốn lưu một danh sách các giá trị đơn giản (`List<String> tags`) hoặc danh sách các `@Embeddable` mà **không muốn tạo riêng một Entity có `@Id`**, hãy dùng `@ElementCollection`. JPA sẽ tạo một **bảng phụ** riêng biệt.
 
 ```java
 @Entity
@@ -172,132 +440,108 @@ public class Product {
 
     private String name;
 
+    // Lưu danh sách tags vào bảng phụ "product_tags"
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
-        name = "product_tags", 
+        name = "product_tags",
         joinColumns = @JoinColumn(name = "product_id")
     )
     @Column(name = "tag_name")
     private Set<String> tags = new HashSet<>();
+
+    // Lưu danh sách các Address (Embeddable) vào bảng phụ
+    @ElementCollection
+    @CollectionTable(
+        name = "product_warehouses",
+        joinColumns = @JoinColumn(name = "product_id")
+    )
+    private Set<Address> warehouseLocations = new HashSet<>();
 }
+```
+
+**CSDL sinh ra 3 bảng:**
+```sql
+CREATE TABLE products (
+    id   BIGINT PRIMARY KEY,
+    name VARCHAR(255)
+);
+
+CREATE TABLE product_tags (
+    product_id  BIGINT REFERENCES products(id),
+    tag_name    VARCHAR(255)
+);
+
+CREATE TABLE product_warehouses (
+    product_id  BIGINT REFERENCES products(id),
+    street      VARCHAR(255),
+    city        VARCHAR(255),
+    -- ... (các cột của Address)
+);
 ```
 
 > [!WARNING]
-> Khi bạn xóa hoặc sửa một phần tử trong `@ElementCollection` kiểu `List`, Hibernate có hành vi mặc định rất nguy hiểm: **Xóa TOÀN BỘ các dòng trong bảng phụ rồi INSERT lại từ đầu!**  
-> **Giải pháp:** Luôn sử dụng `Set<T>` thay vì `List<T>` cho `@ElementCollection`.
+> **Cạm bẫy hiệu năng nghiêm trọng khi dùng `List<T>` với `@ElementCollection`:**
+>
+> Khi bạn **xóa hoặc sửa** một phần tử trong `@ElementCollection` kiểu `List`, Hibernate có hành vi mặc định cực kỳ nguy hiểm:
+> 1. **XÓA TOÀN BỘ** các dòng trong bảng phụ liên quan đến Entity mẹ (`DELETE FROM product_tags WHERE product_id = ?`).
+> 2. **INSERT LẠI** toàn bộ danh sách từ đầu!
+>
+> **Lý do:** `List` cho phép phần tử trùng lặp → Hibernate không có cách nào xác định **chính xác** dòng nào cần xóa/sửa.
+>
+> **Giải pháp:** **Luôn sử dụng `Set<T>` thay vì `List<T>`** cho `@ElementCollection`. `Set` yêu cầu mỗi phần tử là duy nhất → Hibernate có thể xóa/sửa chính xác từng dòng.
+
+### 3.5 `@ElementCollection` vs `@OneToMany` — Khi nào dùng cái nào?
+
+| Tiêu chí | `@ElementCollection` | `@OneToMany` Entity |
+| :--- | :--- | :--- |
+| **Phần tử có ID?** | ❌ Không (Value type) | ✅ Có (`@Id`) |
+| **Phần tử tồn tại độc lập?** | ❌ Không (phụ thuộc Entity mẹ) | ✅ Có thể |
+| **Có thể query trực tiếp?** | ❌ Phải query qua Entity mẹ | ✅ Có Repository riêng |
+| **Cascade/orphanRemoval?** | Tự động (luôn cascade) | Phải cấu hình |
+| **Hiệu năng xóa/sửa** | ⚠️ Kém (DELETE all + INSERT all nếu List) | ✅ Tốt (xóa/sửa từng dòng) |
+| **Dùng khi** | Tags, labels, enum list, Value Objects nhỏ | Entity con có nghiệp vụ riêng |
 
 ---
 
-## 3. Chiến lược sinh Khóa chính (Primary Key Strategies)
-
-JPA cung cấp 4 chiến lược sinh khóa thông qua `@GeneratedValue(strategy = ...)`:
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        GenerationType Strategies                       │
-├──────────────────┬──────────────────┬──────────────────┬───────────────┤
-│    IDENTITY      │     SEQUENCE     │      TABLE       │     AUTO      │
-│ (DB Auto-inc)    │ (DB Sequence)    │ (Bảng phụ - Chậm)│ (JPA tự chọn) │
-└──────────────────┴──────────────────┴──────────────────┴───────────────┘
-```
-
-### 3.1 `GenerationType.IDENTITY`
-- **Cơ chế:** Dựa vào cột `AUTO_INCREMENT` của MySQL hoặc `SERIAL` / `IDENTITY` của PostgreSQL. CSDL tự động sinh ID khi câu lệnh SQL `INSERT` được thực thi.
-- **Ưu điểm:** Đơn giản, dễ hiểu, phù hợp dự án nhỏ.
-- **Nhược điểm chí mạng (Senior Gotcha):**
-  - JPA bắt buộc phải có ID để nạp Entity vào Persistence Context (Identity Map).
-  - Vì vậy, khi gọi `em.persist(entity)`, Hibernate **bị ép buộc phải gửi ngay lập tức lệnh INSERT xuống DB** để lấy ID về.
-  - **Hậu quả:** Hoàn toàn phá vỡ cơ chế trì hoãn ghi (Write-Behind) và **vô hiệu hóa 100% JDBC Batching**!
-
----
-
-### 3.2 `GenerationType.SEQUENCE` ⭐ (Chuẩn Enterprise Khuyên dùng)
-- **Cơ chế:** Dựa vào đối tượng `SEQUENCE` độc lập trong CSDL (PostgreSQL, Oracle, SQL Server).
-- **Thuật toán tối ưu HiLo / Pooled-Lo Optimizer:**
-  - Nhờ tham số `allocationSize = 50`, Hibernate chỉ cần gọi `SELECT nextval('my_seq')` **đúng 1 lần để lấy trước một dải 50 ID**.
-  - Sau đó, 49 lệnh `persist()` tiếp theo Hibernate tự sinh ID trên bộ nhớ RAM mà **không cần chạm vào CSDL**!
-  - **Ưu điểm vượt trội:** Giữ nguyên vẹn tính năng Write-Behind và hỗ trợ hoàn hảo **JDBC Batching** hàng chục nghìn bản ghi.
-
-```java
-@Id
-@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "order_seq_gen")
-@SequenceGenerator(
-    name = "order_seq_gen",
-    sequenceName = "orders_id_seq",
-    initialValue = 1,
-    allocationSize = 50 // Lấy trước 50 ID mỗi lần gọi CSDL
-)
-private Long id;
-```
-
----
-
-### 3.3 Chuẩn hiện đại: UUID v7 (Time-Ordered Epoch UUID) trong Hibernate 7 & Spring Boot 4.1.0
-
-Trong kiến trúc phân tán (Microservices), dùng khóa chính tự tăng (`Long IDENTITY / SEQUENCE`) có các nhược điểm:
-1. Dễ bị tấn công Enumeration Attack (Kẻ gian đoán được ID: `/api/orders/101`, `/api/orders/102`).
-2. Khó phân tán dữ liệu khi chia Sharding hoặc Multi-Database.
-
-Tuy nhiên, nếu dùng **UUID v4 (Random)** truyền thống, bạn sẽ gặp thảm họa hiệu năng B-Tree Index:
+## 4. Sơ đồ tổng hợp: Mọi Annotation cùng trong 1 Entity
 
 ```mermaid
-flowchart TD
-    subgraph UUIDv4["❌ UUID v4 (Hoàn toàn ngẫu nhiên)"]
-        U1["f47ac10b..."]
-        U2["0a2b4c6d..."]
-        U3["e89b12d3..."]
-        Frag["⚠️ Thảm họa B-Tree Fragmentation:<br>Các bản ghi mới bị chèn ngẫu nhiên vào giữa cây B-Tree Index<br>Gây ra Page Splits liên tục, phình to đĩa cứng, tốc độ INSERT tụt dốc!"]
-        U1 --> Frag
-        U2 --> Frag
-        U3 --> Frag
-    end
+classDiagram
+    class Product {
+        <<Entity>>
+        @Id @GeneratedValue Long id
+        @NaturalId String sku
+        @Column String name
+        @Enumerated(STRING) ProductStatus status
+        @Column(precision=19, scale=4) BigDecimal price
+        @Embedded AuditMetadata audit
+        @ElementCollection Set~String~ tags
+        @Transient BigDecimal finalPrice
+    }
 
-    subgraph UUIDv7["✅ UUID v7 (Tuần tự theo Unix Epoch Timestamp)"]
-        V1["0189a3f2-1001... (Thời điểm T1)"]
-        V2["0189a3f2-1002... (Thời điểm T2)"]
-        V3["0189a3f2-1003... (Thời điểm T3)"]
-        Fast["🎉 Tối ưu B-Tree Index tuyệt đối:<br>Dữ liệu luôn được ghi nối đuôi (Append-only) vào cuối cây Index!<br>Vừa duy nhất toàn cầu, vừa có tốc độ INSERT nhanh như Long Sequence!"]
-        V1 --> Fast
-        V2 --> Fast
-        V3 --> Fast
-    end
+    class AuditMetadata {
+        <<Embeddable>>
+        @Column(updatable=false) Instant createdAt
+        @Column Instant updatedAt
+        @Column(updatable=false) String createdBy
+    }
 
-    style Frag fill:#ef4444,color:white
-    style Fast fill:#22c55e,color:white
-```
+    class ProductStatus {
+        <<Enum>>
+        DRAFT
+        ACTIVE
+        DISCONTINUED
+    }
 
-#### Cấu hình UUID v7 chuẩn trong Hibernate 7 / Spring Boot 4.1.0:
-Từ Hibernate 6.5+ và Hibernate 7.x, Hibernate đã tích hợp sẵn generator cho **UUID v7**:
-
-```java
-@Entity
-@Table(name = "invoices")
-public class Invoice {
-
-    @Id
-    @GeneratedValue(generator = "uuid7-generator")
-    @org.hibernate.annotations.GenericGenerator(
-        name = "uuid7-generator",
-        type = org.hibernate.id.uuid.UuidGenerator.class,
-        parameters = @org.hibernate.annotations.Parameter(
-            name = "uuid_gen_strategy",
-            value = "org.hibernate.id.uuid.CustomVersionSevenStrategy"
-        )
-    )
-    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
-    private UUID id;
-
-    private String invoiceNumber;
-    private BigDecimal amount;
-    // ...
-}
+    Product *-- AuditMetadata : @Embedded
+    Product --> ProductStatus : @Enumerated
 ```
 
 ---
 
-## 4. Code mẫu hoàn chỉnh chuẩn Spring Boot 4.1.0 & Java 21
+## 5. Code mẫu hoàn chỉnh chuẩn Spring Boot 4.1.0 & Java 21
 
-Dưới đây là một Entity hoàn chỉnh áp dụng toàn bộ các thực hành tốt nhất (Best Practices) của Senior:
+Dưới đây là một Entity hoàn chỉnh áp dụng toàn bộ các thực hành tốt nhất (Best Practices):
 
 ```java
 package com.example.domain;
@@ -314,7 +558,6 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 
 @Entity
 @Table(
@@ -325,43 +568,54 @@ import java.util.UUID;
     }
 )
 @Getter @Setter
-@NoArgsConstructor(access = AccessLevel.PROTECTED) // Bảo vệ Constructor cho JPA Proxy
+@NoArgsConstructor(access = AccessLevel.PROTECTED) // 1️⃣ Constructor no-arg protected cho JPA Proxy
 public class Product {
 
+    // 2️⃣ Chiến lược khóa chính: SEQUENCE + allocationSize cho JDBC Batching
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "product_seq")
     @SequenceGenerator(name = "product_seq", sequenceName = "products_seq", allocationSize = 50)
     private Long id;
 
-    @NaturalId // Khóa tự nhiên bất biến để so sánh equals/hashCode an toàn
+    // 3️⃣ NaturalId: Khóa tự nhiên bất biến để so sánh equals/hashCode an toàn
+    @NaturalId
     @Column(nullable = false, unique = true, updatable = false, length = 64)
     private String sku;
 
     @Column(nullable = false, length = 200)
     private String name;
 
-    @Enumerated(EnumType.STRING) // BẮT BUỘC dùng STRING
+    // 4️⃣ Enum STRING bắt buộc
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private ProductStatus status = ProductStatus.DRAFT;
 
+    // 5️⃣ BigDecimal cho dữ liệu tài chính
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal price;
 
+    // 6️⃣ Embeddable cho Value Object theo chuẩn DDD
     @Embedded
     private AuditMetadata auditMetadata = new AuditMetadata();
 
+    // 7️⃣ ElementCollection luôn dùng Set thay vì List
     @ElementCollection
     @CollectionTable(name = "product_tags", joinColumns = @JoinColumn(name = "product_id"))
     @Column(name = "tag", length = 50)
-    private Set<String> tags = new HashSet<>(); // Luôn dùng Set cho ElementCollection
+    private Set<String> tags = new HashSet<>();
 
+    // 8️⃣ Transient: Giá trị tính toán, không lưu DB
+    @Transient
+    private BigDecimal discountedPrice;
+
+    // 9️⃣ Constructor nghiệp vụ rõ ràng
     public Product(String sku, String name, BigDecimal price) {
         this.sku = Objects.requireNonNull(sku, "SKU không được null");
         this.name = name;
         this.price = price;
     }
 
-    // ⭐ EQUALS VÀ HASHCODE CHUẨN SENIOR (Dựa trên NaturalId bất biến)
+    // 🔟 EQUALS & HASHCODE CHUẨN: Dựa trên NaturalId bất biến
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -376,34 +630,106 @@ public class Product {
 }
 ```
 
+```java
+// Embeddable phụ trợ — Metadata kiểm toán tái sử dụng ở mọi Entity
+@Embeddable
+@Getter @Setter
+public class AuditMetadata {
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt = Instant.now();
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
+
+    @Column(name = "created_by", updatable = false, length = 100)
+    private String createdBy;
+
+    @Column(name = "updated_by", length = 100)
+    private String updatedBy;
+}
+```
+
 ---
 
 ## 🔥 Ứng dụng thực tế (Thực tế dùng để làm gì? Giải quyết vấn đề gì?)
 
-1. **Bảo vệ toàn vẹn dữ liệu qua nhiều năm:** Dùng `@Enumerated(EnumType.STRING)` và `@Column(updatable = false)` giúp dữ liệu tài chính, ngày tạo đơn hàng không bao giờ bị biến đổi hoặc lỗi logic khi mở rộng hệ thống.
-2. **Tối ưu hóa B-Tree Index cho Microservices:** Chuyển đổi từ UUID v4 ngẫu nhiên sang **UUID v7 tuần tự** giúp giảm 70% dung lượng phân mảnh index, tăng tốc độ chèn dữ liệu lên gấp 3 lần trong các hệ thống ghi lớn.
-3. **Mã nguồn sạch và tái sử dụng cao (DRY):** Sử dụng `@Embeddable` cho các khái niệm như `Address`, `AuditMetadata`, `Money` giúp gom nhóm logic nghiệp vụ chặt chẽ theo chuẩn Domain-Driven Design (DDD).
+### Ví dụ thực tế 1: Hệ thống E-commerce — Thiết kế Entity cho sản phẩm
+
+**Yêu cầu nghiệp vụ:** Xây dựng hệ thống quản lý sản phẩm cho sàn thương mại điện tử với hàng triệu sản phẩm.
+
+| Quyết định thiết kế | Giải pháp | Lý do |
+| :--- | :--- | :--- |
+| Trạng thái sản phẩm | `@Enumerated(EnumType.STRING)` | Bảo vệ dữ liệu khi thêm trạng thái mới (`FLASH_SALE`, `PRE_ORDER`). |
+| Địa chỉ kho hàng | `@Embeddable Address` + `@ElementCollection` | Một sản phẩm có thể ở nhiều kho, mỗi kho là Value Object không cần ID. |
+| Thông tin kiểm toán | `@Embedded AuditMetadata` | Tái sử dụng ở mọi Entity: `Product`, `Order`, `Customer` đều embed cùng class. |
+| Giá tiền | `BigDecimal` + `precision = 19, scale = 4` | Tuyệt đối không dùng `Double` cho tiền tệ (lỗi làm tròn floating-point). |
+| Mô tả dài | `@Column(length = 5000)` hoặc `@Lob` | Mô tả sản phẩm có thể dài hàng nghìn ký tự. |
+
+### Ví dụ thực tế 2: Mã nguồn sạch và tái sử dụng (DRY) với Embeddable
+
+Sử dụng `@Embeddable` cho các khái niệm DDD như `Address`, `AuditMetadata`, `Money`, `DateRange`:
+
+```java
+// Một class Embeddable — Tái sử dụng ở 10+ Entity khác nhau:
+@Embeddable
+public class Money {
+    @Column(precision = 19, scale = 4)
+    private BigDecimal amount;
+
+    @Column(length = 3)
+    private String currency;  // "VND", "USD", "EUR"
+}
+
+@Embeddable
+public class DateRange {
+    @Column(nullable = false)
+    private LocalDate startDate;
+
+    private LocalDate endDate;  // null = vô thời hạn
+}
+```
+
+→ Bất kỳ Entity nào cần giá tiền chỉ cần `@Embedded private Money price;` — **không cần copy-paste 2 cột**. Bất kỳ Entity nào cần khoảng thời gian chỉ cần `@Embedded private DateRange validPeriod;`.
+
+### Ví dụ thực tế 3: Hibernate NamingStrategy — Tự động snake_case
+
+Trong Spring Boot 4.1.0, Hibernate mặc định dùng `SpringPhysicalNamingStrategy` để tự động chuyển đổi:
+
+```
+Java field name    →    Database column name
+──────────────────────────────────────────────
+firstName          →    first_name
+orderItems         →    order_items
+createdAt          →    created_at
+UserProfile (class)→    user_profile (table)
+```
+
+→ Bạn **không cần** viết `@Column(name = "first_name")` cho mỗi field nếu đã dùng NamingStrategy mặc định. Chỉ cần `@Column(name = ...)` khi muốn tên cột **khác** quy tắc snake_case.
 
 ---
 
-## 5. Tổng hợp các chủ đề (Bản đồ tra cứu)
+## 6. Tổng hợp các chủ đề (Bản đồ tra cứu)
 
 ### 🟢 Ưu tiên phải biết trước (Bắt buộc)
-- Các Annotation cơ bản: `@Entity`, `@Table`, `@Id`, `@Column`.
-- Bắt buộc phải có Constructor no-arg và không được khai báo class/method là `final`.
-- Quy tắc bắt buộc: Luôn sử dụng `@Enumerated(EnumType.STRING)` thay vì `ORDINAL`.
-- Bản chất và cách dùng `@Embeddable` & `@Embedded`.
+1. **Các Annotation cơ bản:** `@Entity`, `@Table`, `@Id`, `@Column` — nền tảng của mọi thứ trong JPA.
+2. **Quy tắc Entity class:** Constructor no-arg bắt buộc, không được `final` (vì ByteBuddy Proxy).
+3. **`@Enumerated(EnumType.STRING)`:** Quy tắc bắt buộc — **KHÔNG BAO GIỜ dùng `ORDINAL`** trên production.
+4. **Bản chất `@Embeddable` & `@Embedded`:** Value Object không có ID riêng, các cột nằm chung bảng với Entity mẹ.
+5. **Kiểu ngày/giờ hiện đại:** Dùng `Instant` (timestamp UTC) và `LocalDate` (ngày), bỏ `java.util.Date`.
 
 ### 🟡 Nhóm trung cấp
-- Cách giải quyết trùng tên cột với `@AttributeOverrides`.
-- Lưu trữ danh sách giá trị phụ với `@ElementCollection` (Tại sao nên dùng `Set` thay vì `List`).
-- Phân biệt chi tiết 4 chiến lược sinh khóa: `IDENTITY`, `SEQUENCE`, `TABLE`, `AUTO`.
-- Tối ưu hóa Sequence với `allocationSize` (HiLo algorithm).
+1. **Tái sử dụng Embeddable với `@AttributeOverrides`:** Khi cùng một class Embeddable xuất hiện nhiều lần trong Entity.
+2. **`@ElementCollection` + `Set<T>`:** Lưu danh sách giá trị đơn giản vào bảng phụ, luôn dùng `Set` thay vì `List` để tránh DELETE-all + INSERT-all.
+3. **`@ElementCollection` vs `@OneToMany`:** Hiểu khi nào dùng Value type (Element) và khi nào cần Entity con riêng.
+4. **`@Transient` vs `transient` keyword:** Cả hai đều không lưu DB, nhưng `@Transient` rõ ràng hơn cho JPA.
+5. **`columnDefinition` cho DDL tùy chỉnh:** Sử dụng khi cần kiểu dữ liệu CSDL đặc biệt (`jsonb`, `uuid`, `tsvector`).
 
 ### 🔴 Nhóm nâng cao
-- Bản chất tại sao `IDENTITY` phá vỡ Write-Behind và JDBC Batching.
-- Hiện tượng B-Tree Index Fragmentation khi dùng UUID v4 và giải pháp **UUID v7 Time-Ordered** trong Hibernate 7.
-- Thiết kế `equals()` và `hashCode()` cho Entity dựa trên `@NaturalId` để an toàn tuyệt đối với `HashSet` và `HashMap`.
+1. **Hibernate `NamingStrategy`:** `PhysicalNamingStrategy` vs `ImplicitNamingStrategy` — kiểm soát quy tắc đặt tên bảng/cột toàn dự án.
+2. **`@Lob` và dữ liệu lớn:** Trade-off giữa lưu file trong DB vs Object Storage, kỹ thuật streaming cho BLOB lớn.
+3. **`@Formula` (Hibernate extension):** Cột ảo tính toán bằng SQL native mà không lưu trong DB.
+4. **`@ColumnTransformer` (Hibernate extension):** Mã hóa/giải mã dữ liệu tự động khi read/write (ví dụ: AES encryption cho PII data).
 
 ---
 
@@ -412,10 +738,12 @@ public class Product {
 | Tài liệu | Link liên kết |
 |---|---|
 | Jakarta Persistence 3.2 — Chapter 2: Entity Classes & Annotations | [jakarta.ee/specifications/persistence/3.2](https://jakarta.ee/specifications/persistence/3.2/) |
-| Hibernate ORM 7.0 User Guide — Identifiers & Generators | [docs.jboss.org/hibernate/orm/7.0/userguide/html_single/Hibernate_User_Guide.html#identifiers](https://docs.jboss.org/hibernate/orm/7.0/userguide/html_single/Hibernate_User_Guide.html#identifiers) |
-| Vlad Mihalcea — Why you should use UUID v7 in database | [vladmihalcea.com/uuid-database-primary-key/](https://vladmihalcea.com/uuid-database-primary-key/) |
-| Vlad Mihalcea — How to implement equals and hashCode for JPA Entities | [vladmihalcea.com/how-to-implement-equals-and-hashcode-using-the-jpa-entity-identifier/](https://vladmihalcea.com/how-to-implement-equals-and-hashcode-using-the-jpa-entity-identifier/) |
+| Hibernate ORM 7.0 User Guide — Basic Types | [docs.jboss.org/hibernate/orm/7.0 — Basic Types](https://docs.jboss.org/hibernate/orm/7.0/userguide/html_single/Hibernate_User_Guide.html#basic-types) |
+| Hibernate ORM 7.0 — Naming Strategies | [docs.jboss.org/hibernate/orm/7.0 — Naming](https://docs.jboss.org/hibernate/orm/7.0/userguide/html_single/Hibernate_User_Guide.html#naming) |
+| Vlad Mihalcea — How to map Date and Timestamp with JPA and Hibernate | [vladmihalcea.com/date-timestamp-jpa-hibernate](https://vladmihalcea.com/date-timestamp-jpa-hibernate/) |
+| Baeldung — JPA @Embedded and @Embeddable | [baeldung.com/jpa-embedded-embeddable](https://www.baeldung.com/jpa-embedded-embeddable) |
+| Baeldung — JPA @Column Annotation | [baeldung.com/jpa-column-annotation](https://www.baeldung.com/jpa-entity-table-names) |
 
 ---
 
-> **Tài liệu tiếp theo:** [Relationship Mappings (@OneToOne, @OneToMany, @ManyToOne, @ManyToMany).md](file:///d:/WebSpace/Java-Backend/05-Database/Spring-Data/Spring-Data-JPA/Relationship%20Mappings%20%28@OneToOne,%20@OneToMany,%20@ManyToOne,%20@ManyToMany%29.md) — Đi sâu vào nghệ thuật ánh xạ quan hệ bảng, khái niệm Owning Side và Helper Methods.
+> **Tài liệu tiếp theo:** [Primary Key Strategies.md](file:///d:/WebSpace/Java-Backend/05-Database/Spring-Data/Spring-Data-JPA/Entity%20Mapping%20%26%20Relationships/Primary%20Key%20Strategies.md) — Chiến lược sinh khóa chính IDENTITY, SEQUENCE, TABLE, UUID v7, Composite Key, thuật toán Pooled-Lo Optimizer, `equals()`/`hashCode()` chuẩn Senior, và `@MappedSuperclass`.

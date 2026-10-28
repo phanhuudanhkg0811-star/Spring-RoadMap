@@ -4,6 +4,7 @@
     - OOPs
     - Collections
     - Generics
+    - Exception Handling (Throwable hierarchy: Error vs Exception, Checked vs Unchecked, try-catch-finally, try-with-resources, Multi-catch, Custom Exceptions)
   - Advanced
     - Design Patterns
     - JVM
@@ -43,20 +44,84 @@
   - Properties/YAML
   - Integrations with other Libraries/Frameworks
 
-4. REST API
-  - HTTP Methods
-    - POST
-    - GET
-    - PUT
-    - DELETE
-    - OPTIONS
-    - TRACE
+4. REST API, Request Validation & Exception Handling
+  - HTTP Methods & Semantics
+    - POST (Create - Non-idempotent)
+    - GET (Read - Idempotent & Safe)
+    - PUT (Full Replace - Idempotent)
+    - PATCH (Partial Update - Idempotent or Non-idempotent)
+    - DELETE (Remove - Idempotent)
+    - OPTIONS (CORS Preflight)
+    - HEAD & TRACE
   - HTTP Status Codes
-    - 1.X.X
-    - 2.X.X
-    - 3.X.X
-    - 4.X.X
-    - 5.X.X
+    - 1.X.X (Informational: 100 Continue, 101 Switching Protocols)
+    - 2.X.X (Success: 200 OK, 201 Created, 202 Accepted, 204 No Content)
+    - 3.X.X (Redirection: 301 Moved Permanently, 302 Found, 304 Not Modified)
+    - 4.X.X (Client Errors: 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 422 Unprocessable Content)
+    - 5.X.X (Server Errors: 500 Internal Server Error, 502 Bad Gateway, 503 Service Unavailable, 504 Gateway Timeout)
+  - Request Validation & Data Integrity (Jakarta Bean Validation 3.1 & Hibernate Validator)
+    - Core Architecture: Jakarta Validation (JSR 380) vs Hibernate Validator vs Spring Validation (Validator, BindingResult)
+    - Standard Constraint Annotations (@NotNull, @NotEmpty, @NotBlank, @Size, @Min, @Max, @Email, @Pattern, @PositiveOrZero, @PastOrPresent)
+    - Validation Scopes & Execution Triggers:
+      - Controller RequestBody Validation (@Valid vs @Validated)
+      - Path Variables & Request Parameters Validation (@Validated on Controller class, HandlerMethodValidationException)
+      - Service-layer & Method Validation (@Validated on Service interface/class, ConstraintViolationException)
+      - JPA Entity Validation (Pre-persist/Pre-update checks & performance caveats)
+    - Validation Groups (Group markers for differentiating Create vs Update scenarios)
+    - Custom Constraints & Validators:
+      - Custom Constraint Annotation & ConstraintValidator implementation
+      - Spring Dependency Injection inside Validators (e.g. @UniqueEmail querying Database via Repository)
+      - Class-level Cross-Field Validation (e.g. startDate before endDate, password matches confirmPassword)
+    - Global Exception Handling & Error Formats:
+      - @RestControllerAdvice & @ExceptionHandler
+      - RFC 7807 Problem Details standard (Spring ProblemDetail & ErrorResponse)
+      - Catching and parsing MethodArgumentNotValidException, HandlerMethodValidationException, and ConstraintViolationException
+      - Internationalization (i18n) for validation error messages (ValidationMessages.properties)
+  - Enterprise Best Practices & Validation Checklist
+    - DTO Validation First: Validate strictly at Controller boundary before hitting business logic
+    - Phân biệt chính xác @NotNull vs @NotEmpty vs @NotBlank (cạm bẫy chuỗi chứa khoảng trắng whitespace)
+    - Tuyệt đối không phụ thuộc vào JPA Entity validation làm chốt chặn chính; tránh chi phí validate lặp lại 2 lần
+    - Chuẩn hóa payload trả lỗi thống nhất cho Frontend & Mobile dễ dàng hiển thị theo từng field
+  - Hands-on Labs & Practical Exercises (Bài tập thực hành Validation thực chiến)
+    - Lab 1: Xây dựng Bộ DTO Validation Toàn diện cho API Đăng ký Thành viên (Custom @ValidPhoneNumber, @StrongPassword, @UniqueEmail check DB)
+    - Lab 2: Phân tách ngữ cảnh Tạo mới vs Cập nhật với Validation Groups (OnCreate vs OnUpdate)
+    - Lab 3: Triển khai Global Exception Handler chuẩn RFC 7807 Problem Details với cấu trúc chi tiết từng field lỗi và hỗ trợ đa ngôn ngữ (i18n)
+  - Exception Handling Architecture & Global Error Responses (Spring Boot 3/4 & RFC 7807)
+    - Core Architecture & Internals:
+      - Spring Boot Error Flow: Filter Chain error dispatch -> DispatcherServlet -> HandlerExceptionResolver hierarchy -> BasicErrorController
+      - Controller-Level vs Global Exception Handling (@ExceptionHandler vs @RestControllerAdvice / @ControllerAdvice)
+      - ResponseEntityExceptionHandler Deep Dive: Overriding hook methods (handleMethodArgumentNotValid, handleNoResourceFoundException, handleHttpRequestMethodNotSupported)
+    - Modern RFC 7807 Problem Details (Spring 6 / Spring Boot 3 & 4):
+      - ProblemDetail & ErrorResponseException abstractions
+      - Global activation via spring.mvc.problemdetails.enabled=true
+      - Custom ProblemDetail extensions (timestamp, correlationId, serviceName, traceId, fieldErrors map)
+    - Domain-Driven Custom Business Exceptions Architecture:
+      - Base AppException extends RuntimeException (clean transactional rollback semantics)
+      - Specific Business Exceptions: ResourceNotFoundException, DuplicateResourceException, InsufficientBalanceException, BadRequestException
+      - Enterprise ErrorCode Architecture: Centralized Enum ErrorCode (HTTP Status, unique internal code, human-readable message, error classification)
+    - Security, Logging & Observability in Exception Handling:
+      - Information Leakage Prevention (OWASP A05): Hiding database tables, SQL queries, stacktraces from client responses
+      - MDC (Mapped Diagnostic Context) Logging: Tracing errors with Correlation ID / Trace ID across microservices
+      - Asynchronous Exception Handling (@Async AsyncUncaughtExceptionHandler, TaskDecorator context propagation)
+  - Enterprise Best Practices & Exception Handling Checklist
+    - Always inherit from ResponseEntityExceptionHandler in @RestControllerAdvice to preserve standard HTTP status codes
+    - Never catch Throwable or Generic Exception blindly (catch (Exception e) {} anti-pattern)
+    - Prefer Unchecked Exceptions (RuntimeException) in business services for clean automatic transaction rollback
+    - Never expose stacktraces, database constraints, or internal server IPs in client-facing error payloads
+    - Always attach a unique Correlation ID / Trace ID to both response payload and server logs for instant production troubleshooting
+  - Hands-on Labs & Practical Exercises (Bài tập thực hành Exception Handling thực chiến)
+    - Lab 1: Xây dựng Global Exception Handler Chuẩn Enterprise với @RestControllerAdvice kế thừa ResponseEntityExceptionHandler
+      - Bài tập 1.1: Tắt Whitelabel Error Page, xây dựng GlobalExceptionHandler xử lý tập trung mọi ngoại lệ hệ thống và validation
+      - Bài tập 1.2: Override các phương thức của ResponseEntityExceptionHandler để chuẩn hóa response cho lỗi 404, 405, 415, 400
+      - Bài tập 1.3: Cấu hình chuẩn RFC 7807 ProblemDetail kết hợp thêm các custom properties (timestamp, path, errorCode, correlationId)
+    - Lab 2: Thiết kế Kiến trúc Custom Business Exceptions & ErrorCode Enum
+      - Bài tập 2.1: Xây dựng Enum ErrorCode quản lý tập trung toàn bộ mã lỗi của dự án (USER_NOT_FOUND, EMAIL_ALREADY_EXISTS, PAYMENT_FAILED)
+      - Bài tập 2.2: Tạo lớp gốc AppException và các exception nghiệp vụ cụ thể, tích hợp vào Service layer
+      - Bài tập 2.3: Bắt và chuyển hóa ngoại lệ Database (DataIntegrityViolationException) thành lỗi nghiệp vụ DuplicateResourceException thân thiện với người dùng
+    - Lab 3: Tích hợp MDC Trace ID & Logging Bảo mật trong Môi trường Microservices
+      - Bài tập 3.1: Viết OncePerRequestFilter tự động trích xuất hoặc sinh mã X-Correlation-ID (UUID), đưa vào Logback MDC
+      - Bài tập 3.2: Đính kèm correlationId vào payload ProblemDetail trả về khi xảy ra lỗi 500 (Internal Server Error)
+      - Bài tập 3.3: Viết Integration Test kiểm tra: Khi Client nhận lỗi 500 kèm mã Trace ID, kỹ sư kiểm tra log server thấy đầy đủ stacktrace mà Client không bị lộ bất kỳ thông tin nhạy cảm nào
 
 5. Database
   - SQL
@@ -64,6 +129,7 @@
     - Postgress SQL
     - Oracle
   - No SQL
+    - Redis (In-Memory Key-Value Store & Distributed Cache)
     - Mongo Db
     - Cassandra
   - Spring Data 
@@ -120,6 +186,38 @@
       - Modern Spring Boot Integration
         - Spring Boot 4.1.0 & Spring Framework 7.0.8 compatibility (Jakarta Persistence 3.2, Hibernate 7)
         - Virtual Threads (Loom) with Connection Pooling (HikariCP thread-pinning avoidance)
+      - Enterprise Best Practices & Production Checklist
+        - Entity Design Rules (100% LAZY by default, no collection setters, unmodifiable getter lists, defensive helper methods, equals/hashCode with ID/UUID)
+        - Cascading & Relationship Rules (Never CascadeType.REMOVE/ALL on @ManyToOne or @ManyToMany, orphanRemoval on Aggregate boundaries only)
+        - Fetching & Querying Rules (DTO/Record projections for read APIs, Dynamic fetching via JOIN FETCH / @EntityGraph, avoid Cartesian explosion)
+        - Transaction & Connection Management (Strictly disable OSIV spring.jpa.open-in-view=false, minimize @Transactional scope, readOnly=true optimization, no network/3rd-party calls inside transactions)
+        - High-Volume & Concurrency Rules (Batch sizes order_inserts/order_updates, HikariCP leakDetectionThreshold, optimistic locking on concurrent resources)
+      - Hands-on Labs & Practical Exercises (Bài tập thực hành thực chiến từ cơ bản đến nâng cao)
+        - Lab 1: Vòng đời Cascade & Quản lý Bản ghi Mồ côi (E-Commerce Order & OrderItems)
+          - Bài tập 1.1: Tạo quan hệ 2 chiều Order - OrderItem, viết defensive helper methods (addItem, removeItem) đồng bộ cả 2 đầu trong RAM
+          - Bài tập 1.2: Tái hiện lỗi TransientPropertyValueException khi lưu Order chứa OrderItem mới mà thiếu CascadeType.PERSIST; Quan sát cách fix và log SQL
+          - Bài tập 1.3: Thử nghiệm orphanRemoval = true: Xóa 1 item khỏi List và quan sát Hibernate tự động chạy DELETE; So sánh với trường hợp chỉ có CascadeType.REMOVE (lỗi null FK constraint)
+          - Bài tập 1.4: Tái hiện "Thảm họa xóa ngược": Cấu hình sai CascadeType.ALL trên @ManyToOne (Employee -> Department), thực hiện xóa nhân viên và chứng kiến toàn bộ phòng ban bị xóa sạch
+          - Bài tập 1.5: Tối ưu Shared Primary Key @OneToOne với @MapsId giữa User và UserProfile, đối chiếu số lượng cột và chỉ mục Index so với FK thông thường
+        - Lab 2: Tối ưu FetchType & Giải quyết triệt để LazyInitializationException (Product Catalog & Review System)
+          - Bài tập 2.1: Tắt OSIV (spring.jpa.open-in-view=false), tạo API trả trực tiếp JPA Entity ra Controller để kích hoạt ngoại lệ LazyInitializationException khi Jackson serialize JSON
+          - Bài tập 2.2: Tái hiện thảm họa N+1 Query khi để quan hệ @ManyToOne mặc định là EAGER; Sử dụng datasource-proxy hoặc hibernate stats để đếm số lượng SQL phát sinh
+          - Bài tập 2.3: Giải pháp kiến trúc 1: Viết truy vấn động với JOIN FETCH trong JPQL và @EntityGraph trong Spring Data JPA để nạp toàn bộ quan hệ trong duy nhất 1 câu SQL
+          - Bài tập 2.4: Giải pháp kiến trúc 2: Tối ưu tuyệt đối với DTO / Java 21 Record Projection (Constructor Expression), benchmark đo lường thời gian phản hồi API và mức tiêu thụ RAM
+        - Lab 3: Repositories Nâng cao, Dynamic Specifications & Pagination an toàn
+          - Bài tập 3.1: Xây dựng bộ lọc tìm kiếm sản phẩm đa tiêu chí linh hoạt (Filter by Category, Price Range, In-Stock, Keyword) sử dụng Spring Data JPA Specification<Product> & Criteria API
+          - Bài tập 3.2: Tái hiện cảnh báo Hibernate HHH000104 (In-memory pagination trap) khi kết hợp Pageable với JOIN FETCH ToMany collection, và khắc phục bằng kỹ thuật Two-phase Query hoặc @BatchSize
+          - Bài tập 3.3: Triển khai Keyset Pagination (Cursor-based) với Spring Data Scroll API để lướt trang bảng dữ liệu 1,000,000 bản ghi với tốc độ dưới 5ms
+        - Lab 4: Xử lý Tranh chấp Concurrency & Flash Sale Booking (High Concurrency)
+          - Bài tập 4.1: Viết Integration Test đa luồng với ExecutorService (50 threads đồng thời mua 5 sản phẩm tồn kho), tái hiện lỗi Lost Update và số lượng kho bị âm
+          - Bài tập 4.2: Áp dụng Optimistic Locking (@Version) trên Entity Product, bắt ngoại lệ OptimisticLockException và triển khai cơ chế tự động thử lại (Spring Retry)
+          - Bài tập 4.3: Áp dụng Pessimistic Locking (PESSIMISTIC_WRITE kết hợp SKIP LOCKED) cho tác vụ xử lý giao dịch trừ số dư Ví điện tử / Hàng đợi đơn hàng
+        - Lab 5: Capstone Project Thực tế - Xây dựng Module Bán hàng & Quản lý Hóa đơn chuẩn Enterprise
+          - Thiết kế Aggregate Root hoàn chỉnh: Order, OrderItem, Invoice, PaymentTransaction, Customer
+          - Tích hợp JPA Auditing (@EnableJpaAuditing, @CreatedDate, @LastModifiedBy, AuditorAware)
+          - Triển khai Soft Delete (@SQLDelete kết hợp @SQLRestriction)
+          - Quản lý Database Migration với Flyway & cấu hình ddl-auto=validate
+          - Viết Integration Test toàn diện với @DataJpaTest và Testcontainers (PostgreSQL / MySQL)
     - Spring Data MongoDB
     - Spring Data JDBC
 
@@ -169,6 +267,40 @@
   - Modern Spring Boot Integration
     - Spring Boot 4.1.0 & Spring Framework 7.0.8 / Spring Security 7.x Functional Lambda DSL (http.authorizeHttpRequests(...))
     - Complete removal of WebSecurityConfigurerAdapter & modern component-based configuration
+  - Enterprise Best Practices & Security Production Checklist
+    - Authentication & Password Storage (Use Argon2id or BCrypt cost >= 12, never plaintext, enforce password complexity)
+    - Stateless JWT Architecture (Short-lived Access Token 5-15m, Refresh Token in HttpOnly SameSite Secure Cookie, never put PII in claims)
+    - Refresh Token Security (Refresh Token Rotation - RTR, Token Family Revocation on reuse detection, Redis JTI blacklist)
+    - Filter Chain & Exception Handling (Modern Lambda DSL, CORS configured before Security, custom JSON 401 AuthenticationEntryPoint & 403 AccessDeniedHandler)
+    - Access Control & Authorization (Default deny-all anyRequest().authenticated(), prefer method-level @PreAuthorize over complex URL rules)
+    - Web Defenses & Hardening (Disable CSRF only for stateless JWT APIs, configure HSTS/CSP/X-Frame-Options, Rate limiting against Brute-force via Bucket4j)
+  - Hands-on Labs & Practical Exercises (Bài tập thực hành bảo mật thực chiến từ cơ bản đến nâng cao)
+    - Lab 1: Xây dựng Hệ thống Xác thực Stateless JWT & Refresh Token Rotation (RTR)
+      - Bài tập 1.1: Cấu hình SecurityFilterChain bằng Functional Lambda DSL, tắt CSRF/formLogin/httpBasic, thiết lập SessionCreationPolicy.STATELESS
+      - Bài tập 1.2: Triển khai JwtAuthenticationFilter (OncePerRequestFilter) giải mã Bearer Token, trích xuất Principal & Authorities đưa vào SecurityContextHolder
+      - Bài tập 1.3: Xây dựng Dual-Token Flow: Phát hành Access Token (15 phút) và Refresh Token (7 ngày) lưu trong HttpOnly Cookie
+      - Bài tập 1.4: Triển khai Refresh Token Rotation (RTR) & Phát hiện xâm nhập: Khi một Refresh Token cũ bị dùng lại lần thứ hai (Token Theft), lập tức thu hồi toàn bộ Token Family trong Redis/Database
+      - Bài tập 1.5: Tùy biến CustomAuthenticationEntryPoint (401 Unauthorized) và CustomAccessDeniedHandler (403 Forbidden) trả về JSON chuẩn RFC 7807 (Problem Details)
+    - Lab 2: Phân quyền Đa tầng RBAC & ABAC (Role-Based & Attribute-Based Access Control)
+      - Bài tập 2.1: Phân quyền cấp độ URL với requestMatchers(), phân biệt rõ ràng giữa hasRole('ADMIN') và hasAuthority('SCOPE_read')
+      - Bài tập 2.2: Kích hoạt @EnableMethodSecurity, áp dụng @PreAuthorize với biểu thức SpEL kiểm tra quyền sở hữu tài nguyên (#userId == authentication.principal.id hoặc hasRole('ADMIN'))
+      - Bài tập 2.3: Viết custom PermissionEvaluator để kiểm tra quyền truy cập động trên từng Domain Object cụ thể (User chỉ sửa bài viết của mình, Manager sửa bài của phòng ban)
+      - Bài tập 2.4: Triển khai Dynamic Authorization với AuthorizationManager<RequestAuthorizationContext> tải danh sách quyền hạn từ CSDL không cần khởi động lại ứng dụng
+    - Lab 3: Xác thực OAuth 2.0 & Đăng nhập Mạng xã hội (Social Login & Resource Server)
+      - Bài tập 3.1: Cấu hình Spring Security OAuth2 Client: Đăng nhập bằng Google / GitHub, tùy biến OAuth2UserService để tự động đồng bộ tài khoản về CSDL nội bộ
+      - Bài tập 3.2: Xây dựng OAuth2 Resource Server bảo vệ REST API bằng JWT phát hành bởi Identity Provider độc lập (Keycloak / Auth0) qua JWKS URI endpoint
+      - Bài tập 3.3: Triển khai Token Relay Pattern: Chuyển tiếp Bearer Token an toàn qua các microservices phía sau thông qua OpenFeign / WebClient RequestInterceptor
+    - Lab 4: Phòng thủ Ứng dụng Web & Chống Tấn công Tải cao (Hardening & Web Defenses)
+      - Bài tập 4.1: Cấu hình CORS chuẩn mực với CorsConfigurationSource, vạch trần cạm bẫy dùng Wildcard '*' khi bật allowCredentials=true
+      - Bài tập 4.2: Tích hợp Rate Limiting chống Brute-force & Credential Stuffing bằng Bucket4j + Redis (khóa IP/tài khoản tạm thời sau 5 lần đăng nhập thất bại)
+      - Bài tập 4.3: Triển khai Xác thực 2 yếu tố (2FA / MFA) bằng mã TOTP (Google Authenticator / RFC 6238) kết hợp mã QR Code
+      - Bài tập 4.4: Cấu hình Security HTTP Response Headers (HSTS, CSP, X-Frame-Options: DENY chống Clickjacking)
+    - Lab 5: Capstone Project Thực tế - Xây dựng Module Identity & Access Management (IAM) Microservice hoàn chỉnh
+      - Quy trình Đăng ký, Đăng nhập, Xác thực Email kích hoạt tài khoản và Quên mật khẩu qua OTP
+      - Mã hóa mật khẩu an toàn tuyệt đối với Argon2id (Argon2PasswordEncoder)
+      - Quản lý phiên đăng nhập đa thiết bị (Active Sessions & Force Logout thiết bị lạ)
+      - Đồng bộ SecurityContextHolder an toàn khi tích hợp Virtual Threads (Project Loom) và tác vụ @Async
+      - Viết bộ Integration Test bảo mật toàn diện với @SpringBootTest, MockMvc và @WithMockUser
 
 7. Microservices
   - Spring Cloud
@@ -207,11 +339,76 @@
     - Replication
     - Partitioning
     - Sharding
-  - Redis
-    - Caching
-    - Distributed Locks
-    - Pub/Sub
-    - Rate Limiting
+  - Redis (In-Memory Data Grid & Distributed Cache)
+    - Core Architecture & Storage Internals
+      - In-Memory Single-Threaded Event Loop (I/O Multiplexing - epoll/kqueue) vs Multi-threaded I/O in Redis 6+
+      - Memory Management & Maxmemory Eviction Policies (volatile-lru, allkeys-lru, volatile-lfu, allkeys-lfu, volatile-ttl, noeviction)
+      - Persistence Mechanisms: RDB (Snapshots, BGSAVE, Copy-on-Write) vs AOF (Append-Only File, fsync: always/everysec/no, AOF Rewrite) & Hybrid Persistence
+    - Redis Data Structures & Enterprise Use Cases
+      - String (Caching, Atomic Counters via INCR/DECR, Bitmaps for Daily Check-in / Active Users, Bitfields)
+      - Hash (User Sessions, Shopping Carts, Objects with selective field updates)
+      - List (Message Queues via LPUSH/RPOP, Blocking Queues via BRPOP, Capped Activity Feeds)
+      - Set (Unique Visitors, Tagging systems, Set Operations: SINTER, SUNION, SDIFF for Mutual Friends & Recommendations)
+      - Sorted Set / ZSet (Real-time Leaderboards, Priority Queues, Sliding Window Rate Limiting using timestamp scores)
+      - Geospatial / GEO (Geohash, Location Tracking, GEOADD, GEORADIUS, Nearby Search)
+      - HyperLogLog (Cardinality estimation for massive Unique Pageviews with only ~12KB memory)
+      - Streams (Append-only log, Consumer Groups, Pending Entries List - PEL, XADD, XREADGROUP, XACK, lightweight Kafka alternative)
+      - Probabilistic Structures: Bloom Filter & Cuckoo Filter (Pre-checking key existence to eliminate Cache Penetration)
+    - Spring Data Redis & Client Drivers Integration
+      - Jedis vs Lettuce: Why Lettuce (Netty-based asynchronous & thread-safe) is Spring Boot default
+      - RedisTemplate<K, V> & StringRedisTemplate configuration
+      - Serializers Deep Dive (StringRedisSerializer, GenericJackson2JsonRedisSerializer, Jackson2JsonRedisSerializer, avoidance of JdkSerializationRedisSerializer)
+      - Spring Cache Abstraction (@EnableCaching, @Cacheable, @CachePut, @CacheEvict, @Caching)
+      - Custom RedisCacheManager (Per-cache dynamic TTL configuration, disabling null caching, custom key generators)
+    - Caching Strategies, Patterns & Production Pitfalls
+      - Caching Patterns: Cache-Aside (Lazy Loading), Write-Through, Write-Behind (Write-Back), Refresh-Ahead
+      - The Big Three Cache Disasters (Bộ ba thảm họa Cache & Cách khắc phục triệt để):
+        - Cache Penetration (Truy vấn key không tồn tại): Solution via Cache NULL with short TTL & Bloom Filter
+        - Cache Breakdown / Stampede (Key HOT hết hạn đột ngột): Solution via Mutex Distributed Lock & Logical Expiration
+        - Cache Avalanche (Hàng loạt key hết hạn đồng thời): Solution via Random Jitter TTL & Multi-level Caching
+      - Cache - Database Consistency: Cache-Aside update order (Update Database first, then Delete Cache; Handling race condition via Transactional Outbox / CDC Debezium)
+      - Two-Level Caching Architecture (L1 Local Memory with Caffeine / Ehcache + L2 Distributed Redis)
+    - Distributed Locks & Concurrency Control
+      - Primitive SETNX Pitfalls: Expiration before task completion, no reentrancy, premature release
+      - Redisson Framework Deep Dive:
+        - Watchdog mechanism (Automatic lock lease time renewal / auto-heartbeat)
+        - RLock, RFairLock, RReadWriteLock, RSemaphore, RCountDownLatch
+      - Redlock Algorithm: Multi-node distributed lock consensus & Martin Kleppmann's safety critique
+    - Messaging & Real-Time Communication
+      - Redis Pub/Sub (PUBLISH, SUBSCRIBE, PSUBSCRIBE) — Fire-and-forget, ephemeral, no persistence
+      - Redis Streams vs Kafka/RabbitMQ (Persistent messages, Consumer Groups, Dead-letter handling)
+    - High Availability, Clustering & Scalability
+      - Redis Master-Replica Replication (Asynchronous replication, Replication Buffer, PSYNC)
+      - Redis Sentinel (Quorum, Sentinel Failover, Split-Brain prevention)
+      - Redis Cluster Architecture (16384 Hash Slots, CRC16 hashing, slot resharding, cross-slot multi-key operations & {hash-tag})
+    - Enterprise Best Practices & Production Checklist
+      - Connection Pooling configuration (Lettuce Connection Pool sizing with commons-pool2, timeout settings)
+      - Strictly avoid KEYS * in production (blocks event loop); always use SCAN with MATCH & COUNT
+      - Strict Key Naming Convention (namespace:entity:id:field e.g. ecommerce:order:1024:items)
+      - Enforce TTL on every cache key to prevent memory leaks
+      - BigKey & HotKey detection & remediation (redis-cli --bigkeys, splitting large collections, local caching for hotkeys)
+      - Lua Scripting (RedisScript) for atomic operations (Rate Limiting, multi-step balance checks)
+    - Hands-on Labs & Practical Exercises (Bài tập thực hành Redis thực chiến từ cơ bản đến nâng cao)
+      - Lab 1: Triển khai Caching Chuẩn Enterprise & Khắc phục Bộ ba Thảm họa Cache (Penetration, Breakdown, Avalanche)
+        - Bài tập 1.1: Cấu hình Spring Data Redis + Lettuce, tùy biến RedisCacheManager hỗ trợ JSON Serialization và dynamic TTL cho từng cache name
+        - Bài tập 1.2: Triển khai mô hình Cache-Aside với @Cacheable, @CachePut, @CacheEvict trên Service layer
+        - Bài tập 1.3: Tái hiện & khắc phục Thảm họa Cache Penetration bằng cách Cache NULL với TTL ngắn kết hợp Redisson Bloom Filter
+        - Bài tập 1.4: Tái hiện & khắc phục Thảm họa Cache Breakdown (Hot Key hết hạn) bằng Mutex Distributed Lock (Redisson) và cơ chế Logical Expiration
+        - Bài tập 1.5: Khắc phục Thảm họa Cache Avalanche bằng kỹ thuật Random Jitter TTL (random lệch 5-10 phút cho mỗi key)
+      - Lab 2: Triển khai Khóa Phân tán Chuẩn (Distributed Lock) với Redisson & Chống Bán Quá Số Lượng (Flash Sale)
+        - Bài tập 2.1: Viết Integration Test đa luồng (100 threads đồng thời mua 10 sản phẩm tồn kho), tái hiện lỗi race condition bán âm kho
+        - Bài tập 2.2: Triển khai RLock của Redisson với Watchdog tự động gia hạn thời gian khóa (lock auto-renewal)
+        - Bài tập 2.3: Xây dựng Custom Annotation @DistributedLock(key = "#productId", waitTime = 5, leaseTime = 10) kết hợp Spring AOP tái sử dụng toàn dự án
+      - Lab 3: Xây dựng Thuật toán Giới hạn Tốc độ (Rate Limiter) với Redis ZSet & Lua Script
+        - Bài tập 3.1: Viết Lua script thực hiện thuật toán Sliding Window Counter (Cửa sổ trượt) bằng Sorted Set (ZREMRANGEBYSCORE, ZCARD, ZADD)
+        - Bài tập 3.2: Tích hợp thành API Filter / Interceptor chặn request nếu vượt quá 100 requests/phút trên mỗi Client IP/User ID
+      - Lab 4: Hệ thống Xếp hạng Real-time (Leaderboard) & Redis Streams Consumer Group
+        - Bài tập 4.1: Xây dựng Leaderboard triệu người dùng với ZSet (ZINCRBY, ZREVRANGE, ZREVRANK), lấy Top 10 và thứ hạng cá nhân trong < 2ms
+        - Bài tập 4.2: Xây dựng Event-driven Queue bằng Redis Streams (XADD, XREADGROUP, XACK), xử lý tin nhắn bất đồng bộ có Consumer Groups và Retry Dead Letter
+      - Lab 5: Capstone Project Thực tế - Xây dựng Hệ thống Bộ nhớ đệm Đa tầng (Two-Level Cache: L1 Caffeine + L2 Redis)
+        - Tích hợp L1 Local In-Memory Cache (Caffeine) với độ trễ microsecond
+        - Tích hợp L2 Distributed Cache (Redis) với độ trễ millisecond
+        - Đồng bộ việc xóa cache L1 giữa các nodes server qua Redis Pub/Sub khi có lệnh @CacheEvict
   - Messaging Systems
     - Kafka
     - RabbitMQ
